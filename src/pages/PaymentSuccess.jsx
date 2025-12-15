@@ -9,52 +9,108 @@ export default function PaymentSuccess() {
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("checking");
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleConfirmPayment = async () => {
       // Retrieve order data from local storage
-      const pendingOrderData = JSON.parse(localStorage.getItem('pendingOrderData'));
+      const pendingOrderDataStr = localStorage.getItem('pendingOrderData');
       
-      if (!pendingOrderData) {
+      if (!pendingOrderDataStr) {
         console.error("No pending order data found in local storage.");
         setStatus("error");
         setLoading(false);
         return;
       }
 
+      let pendingOrderData;
       try {
+        pendingOrderData = JSON.parse(pendingOrderDataStr);
+      } catch (err) {
+        console.error("Failed to parse pending order data:", err);
+        setStatus("error");
+        setLoading(false);
+        localStorage.removeItem('pendingOrderData');
+        return;
+      }
+
+      // Check if the data is stale (older than 30 minutes)
+      const dataAge = Date.now() - (pendingOrderData.timestamp || 0);
+      if (dataAge > 30 * 60 * 1000) { // 30 minutes
+        console.warn("Pending order data is stale, ignoring...");
+        setStatus("error");
+        setLoading(false);
+        localStorage.removeItem('pendingOrderData');
+        return;
+      }
+
+      try {
+        console.log('🔄 Confirming payment with intent:', paymentIntentId);
+        console.log('📋 Order data:', pendingOrderData);
+
+        // Prepare order data for backend
+        const orderData = {
+          items: pendingOrderData.items,
+          shippingAddress: pendingOrderData.shippingAddress,
+          totalAmount: pendingOrderData.totalAmount,
+          paymentMethod: 'stripe',
+          paymentDetails: {
+            paymentIntentId: paymentIntentId,
+            status: 'succeeded'
+          }
+        };
+
         // Here, you would typically send the paymentIntentId and the order data
         // to your backend to create the order and mark it as paid.
         const response = await confirmPayment({ 
           paymentIntentId,
-          orderData: {
-            items: pendingOrderData.items,
-            shippingAddress: pendingOrderData.shippingAddress,
-            totalAmount: pendingOrderData.totalAmount,
-            paymentMethod: 'stripe',
-            paymentDetails: {
-              paymentIntentId: paymentIntentId,
-              status: 'succeeded'
-            }
-          }
+          orderData
         });
 
-        if (response.success) {
+        console.log('📥 Payment confirmation response:', response);
+
+        if (response && response.success) {
           setStatus("success");
           // Clear the pending order data from local storage
           localStorage.removeItem('pendingOrderData');
           // Redirect to Orders page after 2 seconds
           setTimeout(() => navigate("/orders"), 2000);
         } else {
+          console.error("Payment confirmation failed:", response);
           setStatus("failed");
+          // Don't clear local storage on failure, allow retry
         }
       } catch (err) {
-        console.error(err);
-        setStatus("error");
+        console.error("Error confirming payment:", err);
+        
+        // Handle specific error cases
+        if (err.response?.status === 401) {
+          setStatus("error");
+          setError("Authentication error. Please login again.");
+        } else if (err.response?.status === 400) {
+          setStatus("error");
+          setError("Invalid payment data. Please contact support.");
+        } else if (err.response?.status === 409) {
+          // Order already exists - this is actually success
+          setStatus("success");
+          localStorage.removeItem('pendingOrderData');
+          setTimeout(() => navigate("/orders"), 2000);
+        } else {
+          setStatus("error");
+          setError(err.message || "Failed to confirm payment");
+        }
+        
+        // Don't clear local storage on error unless it's a success case
+        if (status !== "success") {
+          // Keep data for potential retry, but mark it as failed
+          localStorage.setItem('pendingOrderData', JSON.stringify({
+            ...pendingOrderData,
+            failed: true,
+            lastError: err.message
+          }));
+        }
       } finally {
-        // Always clean up local storage
-        localStorage.removeItem('pendingOrderData');
         setLoading(false);
       }
     };
@@ -62,6 +118,7 @@ export default function PaymentSuccess() {
     if (paymentIntentId) {
       handleConfirmPayment();
     } else {
+      console.error("No payment_intent found in URL");
       setStatus("error");
       setLoading(false);
     }
@@ -111,7 +168,9 @@ export default function PaymentSuccess() {
       {status === "error" && (
         <>
           <h1 className="text-3xl font-bold text-orange-600">⚠️ Verification Error</h1>
-          <p className="mt-2 text-lg text-gray-600">We couldn't confirm your payment or find order details.</p>
+          <p className="mt-2 text-lg text-gray-600">
+            {error || "We couldn't confirm your payment or find order details."}
+          </p>
 
           <Link
             to="/cart"

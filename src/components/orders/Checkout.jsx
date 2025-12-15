@@ -144,50 +144,21 @@ const Checkout = () => {
   };
 
   const handlePaymentSuccess = async (paymentDetails) => {
-    setLoading(true);
-    setError('');
-
-    try {
-      // Create order with payment details
-      const orderData = {
-        items: cart.items.map(item => ({
-          productId: item.productId._id || item.productId,
-          quantity: item.quantity,
-          price: item.price
-        })),
-        shippingAddress: {
-          fullName: shippingAddress.fullName,
-          phone: shippingAddress.phone,
-          addressLine1: shippingAddress.addressLine1,
-          city: shippingAddress.city,
-          postalCode: shippingAddress.postalCode,
-          country: shippingAddress.country
-        },
-        totalAmount: cart.totalAmount,
-        paymentMethod: paymentDetails.paymentMethod,
-        paymentDetails: paymentDetails
-      };
-
-      // Confirm payment and create order
-      const data = await confirmPayment({
-        paymentIntentId: paymentDetails.paymentIntentId,
-        orderData: orderData
-      });
-
-      if (data.success) {
-        setSuccessMessage('Payment successful! Order placed successfully.');
-        // Clear cart after successful order
-        setTimeout(() => {
-          navigate('/orders');
-        }, 2000);
-      } else {
-        setError(data.message || 'Failed to confirm payment');
-      }
-    } catch (err) {
-      console.error('Error confirming payment:', err);
-      setError(err.message || 'Failed to confirm payment');
-    } finally {
-      setLoading(false);
+    // For Stripe payments, the order creation is handled by PaymentSuccess page
+    // This function is only called for direct payment success (without redirect)
+    if (paymentDetails.paymentMethod === 'stripe_element') {
+      setSuccessMessage('Payment successful! Redirecting to order confirmation...');
+      // The PaymentSuccess page will handle order creation
+      // Redirect to payment success with the payment intent ID
+      setTimeout(() => {
+        window.location.href = `/payment-success?payment_intent=${paymentDetails.paymentIntentId}`;
+      }, 1000);
+    } else {
+      // Handle other payment methods if needed
+      setSuccessMessage('Payment successful! Order placed successfully.');
+      setTimeout(() => {
+        navigate('/orders');
+      }, 2000);
     }
   };
 

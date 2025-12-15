@@ -386,14 +386,18 @@ export const createPayment = async (paymentData) => {
     console.log('🔄 Creating payment with data:', paymentData);
     console.log('🌐 Making request to:', `${API_URL}/payments`);
     
+    const headers = getAuthHeaders();
+    console.log('🔑 Request headers:', headers);
+    
     const res = await axios.post(`${API_URL}/payments`, paymentData, {
-      headers: getAuthHeaders()
+      headers: headers
     });
     
     console.log('📥 Payment creation response:', res.data);
     console.log('📥 Response status:', res.status);
     console.log('📥 Full response:', res);
     
+    // Return the full response data to preserve the structure
     return res.data;
   } catch (err) {
     console.error('❌ Payment creation error:', err);
@@ -401,7 +405,8 @@ export const createPayment = async (paymentData) => {
     console.error('❌ Error status:', err.response?.status);
     console.error('❌ Error data:', err.response?.data);
     
-    handleApiError(err, 'Create Payment');
+    // Re-throw the error to let the component handle it
+    throw err;
   }
 };
 
