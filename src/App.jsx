@@ -19,9 +19,9 @@ import Checkout from './components/orders/Checkout.jsx';
 import Contact from './components/Contact/Contact.jsx';
 import ChatButton from './components/chat bot/ChatButton.jsx';
 
+
 import PaymentSuccess from './components/payment/PaymentSuccess.jsx';
-import Success from './pages/Success.jsx';
-import Cancel from './pages/Cancel.jsx';
+import PaymentCancel from './components/payment/PaymentCancel.jsx';
 
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -52,8 +52,9 @@ function App() {
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/payment-success" element={<PaymentSuccess />} />
-                <Route path="/success" element={<Success />} />
-                <Route path="/cancel" element={<Cancel />} />
+
+                <Route path="/success" element={<PaymentSuccess />} />
+                <Route path="/cancel" element={<PaymentCancel />} />
               </Routes>
             </Elements>
              {/* Chat Button - Global Component */}
