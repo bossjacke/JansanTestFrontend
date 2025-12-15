@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCart, createOrder, confirmPayment } from '../../api.js';
-import DualPaymentSystem from '../payment/DualPaymentSystem.jsx';
+import StripeCheckoutPayment from '../payment/StripeCheckoutPayment.jsx';
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -421,7 +421,7 @@ const Checkout = () => {
           )}
 
           {paymentMethod === 'stripe' && showPaymentForm && (
-            <DualPaymentSystem
+            <StripeCheckoutPayment
               amount={cart.totalAmount}
               items={cart.items}
               shippingAddress={shippingAddress}
