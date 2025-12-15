@@ -1,141 +1,153 @@
-import React, { useState } from 'react';
-import { createCheckoutSession, createOrder } from '../../api.js';
+import React, { useState, useEffect } from 'react';
+import {
+  PaymentElement,
+  useStripe,
+  useElements
+} from "@stripe/react-stripe-js";
+import { createPaymentIntent } from '../../api.js';
 
-// Stripe Checkout Payment Component
-const StripeCheckoutPayment = ({ amount, items, shippingAddress, onPaymentSuccess, onPaymentError }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+const CheckoutForm = ({ amount, items, shippingAddress, onPaymentSuccess, onPaymentError }) => {
+  const stripe = useStripe();
+  const elements = useElements();
 
-  const handleStripeCheckout = async () => {
-    setLoading(true);
-    setError('');
+  const [message, setMessage] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-    try {
-      const response = await createCheckoutSession({
-        items,
-        shippingAddress,
-        successUrl: `${window.location.origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${window.location.origin}/payment/cancel`
-      });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-      if (!response.success) {
-        setError(response.message);
-        setLoading(false);
-        return;
+    if (!stripe || !elements) {
+      // Stripe.js has not yet loaded.
+      return;
+    }
+
+    setIsLoading(true);
+
+    // Save order data to local storage before redirecting
+    localStorage.setItem('pendingOrderData', JSON.stringify({ items, shippingAddress, totalAmount: amount }));
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/payment-success`,
+      },
+    });
+
+    if (error) {
+      if (error.type === "card_error" || error.type === "validation_error") {
+        setMessage(error.message);
+      } else {
+        setMessage("An unexpected error occurred.");
       }
-
-      // Redirect to Stripe Checkout
-      window.location.href = response.data.url;
-
-    } catch (err) {
-      setError(err.message || 'Failed to create checkout session');
-      onPaymentError(err);
-      setLoading(false);
-    }
-  };
-
-  const handlePaymentSuccess = async (paymentDetails) => {
-    try {
-      console.log('💳 Payment successful, creating order...');
-      // Create order after successful payment
-      const orderData = {
-        items: items,
-        shippingAddress: shippingAddress,
-        totalAmount: amount,
-        paymentMethod: paymentDetails.paymentMethod || 'stripe_checkout',
-        paymentDetails: paymentDetails
-      };
-
-      console.log('📤 Creating order with payment details:', orderData);
-      const orderResponse = await createOrder(orderData);
-      console.log('✅ Order created successfully:', orderResponse);
-      
-      // Pass both payment and order details to parent
+      onPaymentError(error);
+      // Clear local storage if payment fails immediately
+      localStorage.removeItem('pendingOrderData');
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
       onPaymentSuccess({
-        ...paymentDetails,
-        order: orderResponse.data
+        paymentIntentId: paymentIntent.id,
+        paymentMethod: 'stripe_element',
       });
-    } catch (error) {
-      console.error('❌ Error creating order after payment:', error);
-      const errorMsg = error.message || 'Failed to create order after payment';
-      onPaymentError(new Error(errorMsg));
+      // No need to clear local storage here, as PaymentSuccess page will handle it
     }
-  };
 
-  const handlePaymentError = (error) => {
-    onPaymentError(error);
+    setIsLoading(false);
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-      <h3 className="text-gray-800 mb-5 text-xl font-semibold">Payment Method</h3>
-      
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg mb-4">
-          {error}
+    <form id="payment-form" onSubmit={handleSubmit}>
+      <PaymentElement id="payment-element" />
+      <button disabled={isLoading || !stripe || !elements} id="submit" className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-4 rounded-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed hover:from-purple-700 hover:to-blue-700 transition-all mt-4">
+        <span id="button-text">
+          {isLoading ? <div className="spinner" id="spinner"></div> : `Pay now • ₹${(amount).toLocaleString()}`}
+        </span>
+      </button>
+      {message && <div id="payment-message" className="text-red-500 mt-2">{message}</div>}
+    </form>
+  );
+}
+
+const StripeCheckoutPayment = ({ amount, items, shippingAddress, onPaymentSuccess, onPaymentError }) => {
+  const [clientSecret, setClientSecret] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchPaymentIntent = async () => {
+      try {
+        // Check if user is authenticated
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('Unauthorized. Please login to continue with payment.');
+        }
+        
+        console.log('🔄 Creating payment intent for amount:', Math.round(amount * 100));
+        console.log('🔑 Using token:', token.substring(0, 20) + '...');
+        
+        const res = await createPaymentIntent({ amount: Math.round(amount * 100) }); // Amount in cents
+        console.log('📥 Payment intent response:', res);
+        
+        if (res && res.success) {
+          const secret = res.clientSecret || (res.data && res.data.clientSecret);
+          if (secret) {
+            setClientSecret(secret);
+            console.log('✅ Client secret received successfully');
+          } else {
+            console.error('❌ No clientSecret in response data:', res.data);
+            setError('Payment initialization failed: No client secret received');
+            onPaymentError(new Error('No client secret received from server'));
+          }
+        } else {
+          console.error('❌ Payment intent creation failed:', res);
+          const errorMsg = res?.message || 'Failed to create payment intent.';
+          setError(errorMsg);
+          onPaymentError(new Error(errorMsg));
+        }
+      } catch (err) {
+        console.error('❌ Error creating payment intent:', err);
+        let errorMsg = err?.message || 'Error creating payment intent.';
+        
+        // Check if it's an authentication error
+        if (err.message && err.message.includes('Unauthorized')) {
+          errorMsg = 'Please login to continue with payment. Redirecting to login...';
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
+        }
+        
+        setError(errorMsg);
+        onPaymentError(new Error(errorMsg));
+      }
+    };
+
+    if (amount > 0) {
+      fetchPaymentIntent();
+    }
+  }, [amount, onPaymentError]);
+
+  const appearance = {
+    theme: 'stripe',
+  };
+  const options = {
+    clientSecret,
+    appearance,
+  };
+
+  return (
+    <div className="StripeApp">
+      {error && <div className="text-red-500 mb-4">{error}</div>}
+      {clientSecret ? (
+        <CheckoutForm
+          amount={amount}
+          items={items}
+          shippingAddress={shippingAddress}
+          onPaymentSuccess={onPaymentSuccess}
+          onPaymentError={onPaymentError}
+        />
+      ) : (
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+          <p className="ml-3">Initializing Payment...</p>
         </div>
       )}
-
-      {/* Stripe Checkout Payment */}
-      <div>
-        <p className="text-gray-600 mb-4">
-          Choose from multiple payment methods including UPI, NetBanking, and wallets.
-        </p>
-        
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <div className="text-2xl mb-1">💳</div>
-              <div className="text-xs text-gray-600">Cards</div>
-            </div>
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <div className="text-2xl mb-1">📱</div>
-              <div className="text-xs text-gray-600">UPI</div>
-            </div>
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <div className="text-2xl mb-1">🏦</div>
-              <div className="text-xs text-gray-600">NetBanking</div>
-            </div>
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <div className="text-2xl mb-1">👛</div>
-              <div className="text-xs text-gray-600">Wallets</div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleStripeCheckout}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-4 rounded-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed hover:from-purple-700 hover:to-blue-700 transition-all"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-                Redirecting to payment...
-              </span>
-            ) : (
-              `Continue to Payment • ₹${amount.toLocaleString()}`
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Security Badge */}
-      <div className="mt-6 pt-6 border-t border-gray-200">
-        <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
-          <div className="flex items-center">
-            <span className="w-4 h-4 mr-1">🔒</span>
-            Secure Payment
-          </div>
-          <div className="flex items-center">
-            <span className="w-4 h-4 mr-1">✓</span>
-            PCI DSS Compliant
-          </div>
-          <div className="flex items-center">
-            <span className="w-4 h-4 mr-1">🛡️</span>
-            SSL Encrypted
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

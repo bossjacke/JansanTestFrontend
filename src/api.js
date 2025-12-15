@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://jansan-test-backend.vercel.app/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3003/api";
 console.log("Using API URL:", API_URL);
 
 // Helper function to get auth headers
@@ -383,11 +383,24 @@ export const createPayment = async (paymentData) => {
     validateRequired(paymentData, 'Payment data');
     validateRequired(paymentData.amount, 'Payment amount');
     
+    console.log('🔄 Creating payment with data:', paymentData);
+    console.log('🌐 Making request to:', `${API_URL}/payments`);
+    
     const res = await axios.post(`${API_URL}/payments`, paymentData, {
       headers: getAuthHeaders()
     });
+    
+    console.log('📥 Payment creation response:', res.data);
+    console.log('📥 Response status:', res.status);
+    console.log('📥 Full response:', res);
+    
     return res.data;
   } catch (err) {
+    console.error('❌ Payment creation error:', err);
+    console.error('❌ Error response:', err.response);
+    console.error('❌ Error status:', err.response?.status);
+    console.error('❌ Error data:', err.response?.data);
+    
     handleApiError(err, 'Create Payment');
   }
 };
@@ -395,7 +408,7 @@ export const createPayment = async (paymentData) => {
 export const confirmPayment = async (paymentData) => {
   try {
     validateRequired(paymentData, 'Payment confirmation data');
-    validateRequired(paymentData.sessionId, 'Session ID');
+    validateRequired(paymentData.paymentIntentId, 'Payment Intent ID');
     
     const res = await axios.post(`${API_URL}/payments/confirm`, paymentData);
     return res.data;

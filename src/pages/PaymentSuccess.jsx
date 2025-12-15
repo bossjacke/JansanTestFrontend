@@ -5,7 +5,7 @@ import { confirmPayment } from "../api.js";
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
-  const sessionId = searchParams.get("session_id");
+  const paymentIntentId = searchParams.get("payment_intent");
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("checking");
@@ -13,12 +13,37 @@ export default function PaymentSuccess() {
 
   useEffect(() => {
     const handleConfirmPayment = async () => {
+      // Retrieve order data from local storage
+      const pendingOrderData = JSON.parse(localStorage.getItem('pendingOrderData'));
+      
+      if (!pendingOrderData) {
+        console.error("No pending order data found in local storage.");
+        setStatus("error");
+        setLoading(false);
+        return;
+      }
+
       try {
-        const response = await confirmPayment({ sessionId });
+        // Here, you would typically send the paymentIntentId and the order data
+        // to your backend to create the order and mark it as paid.
+        const response = await confirmPayment({ 
+          paymentIntentId,
+          orderData: {
+            items: pendingOrderData.items,
+            shippingAddress: pendingOrderData.shippingAddress,
+            totalAmount: pendingOrderData.totalAmount,
+            paymentMethod: 'stripe',
+            paymentDetails: {
+              paymentIntentId: paymentIntentId,
+              status: 'succeeded'
+            }
+          }
+        });
 
         if (response.success) {
           setStatus("success");
-
+          // Clear the pending order data from local storage
+          localStorage.removeItem('pendingOrderData');
           // Redirect to Orders page after 2 seconds
           setTimeout(() => navigate("/orders"), 2000);
         } else {
@@ -28,18 +53,25 @@ export default function PaymentSuccess() {
         console.error(err);
         setStatus("error");
       } finally {
+        // Always clean up local storage
+        localStorage.removeItem('pendingOrderData');
         setLoading(false);
       }
     };
 
-    if (sessionId) handleConfirmPayment();
-  }, [sessionId, navigate]);
+    if (paymentIntentId) {
+      handleConfirmPayment();
+    } else {
+      setStatus("error");
+      setLoading(false);
+    }
+  }, [paymentIntentId, navigate]);
 
   if (loading) {
     return (
       <div className="flex flex-col items-center mt-20 text-xl">
         <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-purple-600"></div>
-        <p className="mt-4">Verifying your payment...</p>
+        <p className="mt-4">Verifying your payment and placing order...</p>
       </div>
     );
   }
@@ -65,7 +97,7 @@ export default function PaymentSuccess() {
       {status === "failed" && (
         <>
           <h1 className="text-3xl font-bold text-red-600">❌ Payment Failed</h1>
-          <p className="mt-2 text-lg text-gray-600">Something went wrong with your payment.</p>
+          <p className="mt-2 text-lg text-gray-600">Something went wrong while processing your order after payment.</p>
 
           <Link
             to="/cart"
@@ -79,7 +111,7 @@ export default function PaymentSuccess() {
       {status === "error" && (
         <>
           <h1 className="text-3xl font-bold text-orange-600">⚠️ Verification Error</h1>
-          <p className="mt-2 text-lg text-gray-600">We couldn't confirm your payment.</p>
+          <p className="mt-2 text-lg text-gray-600">We couldn't confirm your payment or find order details.</p>
 
           <Link
             to="/cart"

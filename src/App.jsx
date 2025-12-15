@@ -22,6 +22,12 @@ import PaymentSuccess from './pages/PaymentSuccess.jsx';
 import Success from './pages/Success.jsx';
 import Cancel from './pages/Cancel.jsx';
 
+import { Elements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
+
+// Stripe Configuration
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
 function App() {
   return (
     <AuthProvider>
@@ -29,24 +35,26 @@ function App() {
 
           <div>
             <Navbar />
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/products" element={<ProductsPage />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/order/:orderId" element={<OrderDetail />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/payment-success" element={<PaymentSuccess />} />
-              <Route path="/success" element={<Success />} />
-              <Route path="/cancel" element={<Cancel />} />
-            </Routes>
+            <Elements stripe={stripePromise}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/orders" element={<Orders />} />
+                <Route path="/order/:orderId" element={<OrderDetail />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/payment-success" element={<PaymentSuccess />} />
+                <Route path="/success" element={<Success />} />
+                <Route path="/cancel" element={<Cancel />} />
+              </Routes>
+            </Elements>
              {/* Chat Button - Global Component */}
           <ChatButton />
             <Footer />
