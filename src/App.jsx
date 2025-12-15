@@ -17,7 +17,7 @@ import Orders from './components/orders/Orders.jsx';
 import OrderDetail from './components/orders/OrderDetail.jsx';
 import Checkout from './components/orders/Checkout.jsx';
 import Contact from './components/Contact/Contact.jsx';
-import ChatButton from './components/chat/ChatButton.jsx';
+import ChatButton from './components/chat Bot/ChatButton.jsx';
 import PaymentSuccess from './pages/PaymentSuccess.jsx';
 import Success from './pages/Success.jsx';
 import Cancel from './pages/Cancel.jsx';
