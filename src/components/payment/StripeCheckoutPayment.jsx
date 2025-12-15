@@ -1,4 +1,6 @@
+
 import React, { useState } from 'react';
+import { createCheckoutSession } from '../../api.js';
 
 // This component replaces the previous Stripe Elements implementation.
 // It handles the redirect to Stripe's hosted checkout page.
@@ -11,6 +13,18 @@ const StripeCheckoutPayment = ({ items }) => {
     setError(null);
 
     try {
+      // Check if user is authenticated
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Please login to continue with payment.');
+      }
+
+      // Validate items
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        throw new Error('Your cart is empty. Please add items before proceeding to payment.');
+      }
+
+
       // The backend expects a specific format for cart items.
       // Based on Checkout.jsx, item.productId can be an object or a string.
       // We'll standardize it to send only the necessary data.
@@ -24,31 +38,55 @@ const StripeCheckoutPayment = ({ items }) => {
         };
       });
 
-      const response = await fetch('http://localhost:5174/api/payment/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // Token அவசியம்!
-        },
-        body: JSON.stringify({ items: lineItems }),
-      });
-      // 
+      // Calculate total amount from line items
+      const totalAmount = lineItems.reduce((total, item) => {
+        return total + (item.price * item.quantity);
+      }, 0);
 
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session.');
-      }
+      // Prepare payment data for the backend
+      const paymentData = {
+        items: lineItems,
+        amount: totalAmount
+      };
 
-      const data = await response.json();
 
-      if (data.url) {
-        // Redirect the user to the Stripe Checkout page
-        window.location.href = data.url;
+      // Use the standard API function from api.js
+      const response = await createCheckoutSession(paymentData);
+
+      console.log('💳 Stripe checkout response:', response);
+
+      // Check for different possible response formats
+      if (response && response.url) {
+        // Direct URL response
+        window.location.href = response.url;
+      } else if (response && response.sessionUrl) {
+        // Alternative property name
+        window.location.href = response.sessionUrl;
+      } else if (response && response.checkoutUrl) {
+        // Another alternative property name
+        window.location.href = response.checkoutUrl;
+      } else if (response && response.data && response.data.url) {
+        // Nested response structure
+        window.location.href = response.data.url;
+      } else if (response && response.data && response.data.sessionUrl) {
+        // Nested alternative structure
+        window.location.href = response.data.sessionUrl;
       } else {
-        throw new Error('No checkout session URL returned.');
+        console.error('❌ Unexpected response format:', response);
+        throw new Error('No checkout session URL returned. Response: ' + JSON.stringify(response));
       }
     } catch (err) {
       console.error('Error during checkout:', err);
-      setError(err.message || 'An unexpected error occurred. Please try again.');
+      
+      // Handle specific error cases
+      if (err.message.includes('login')) {
+        setError(err.message);
+      } else if (err.message.includes('empty')) {
+        setError(err.message);
+      } else {
+        setError(err.message || 'An unexpected error occurred. Please try again.');
+      }
+      
       setLoading(false);
     }
     // No need to set loading to false on success, as the page will redirect.
