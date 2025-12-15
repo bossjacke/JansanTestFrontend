@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
-import CheckoutForm from "../components/CheckoutForm"; // must match filename exactly
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Checkout() {
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    // Redirect to the main checkout page
+    navigate("/checkout", { replace: true });
+  }, [navigate]);
+
   return (
-    <div className="max-w-3xl mx-auto py-10 px-4">
-      <h2 className="text-3xl font-bold text-purple-700 mb-6">Checkout</h2>
-      <Elements stripe={stripePromise}>
-        <CheckoutForm />
-      </Elements>
+    <div className="max-w-3xl mx-auto py-10 px-4 text-center">
+      <div className="text-lg">Redirecting to checkout...</div>
     </div>
   );
 }

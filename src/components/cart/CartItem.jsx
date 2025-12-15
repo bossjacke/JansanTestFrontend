@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 
 const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
+  const [quantity, setQuantity] = useState(item?.quantity || 1);
+
   // Handle null or undefined item
   if (!item) {
     return (
@@ -9,8 +11,6 @@ const CartItem = ({ item, onUpdateQuantity, onRemove }) => {
       </div>
     );
   }
-
-  const [quantity, setQuantity] = useState(item.quantity || 1);
 
   const handleIncrease = () => {
     const newQuantity = quantity + 1;

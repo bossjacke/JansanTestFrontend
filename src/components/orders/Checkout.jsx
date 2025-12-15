@@ -16,7 +16,6 @@ const Checkout = () => {
     postalCode: '',
     country: 'India'
   });
-  const [user, setUser] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -100,7 +99,6 @@ const Checkout = () => {
       }
 
       if (data.success) {
-        setUser(data.user || data.data);
         setShippingAddress(prev => ({
           ...prev,
           fullName: (data.user?.fullName || data.user?.name || data.data?.fullName || data.data?.name) || '',

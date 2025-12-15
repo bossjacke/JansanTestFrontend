@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { getCart, getMyOrders, createOrder, cancelOrder } from '../../api.js';
 
 
 
 function Orders() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [cart, setCart] = useState(null);
@@ -106,8 +106,7 @@ function Orders() {
         paymentMethod: 'cash_on_delivery'
       };
 
-      const data = await createOrder(orderData);
-      const order = data.data.order;
+      await createOrder(orderData);
 
       setSuccessMessage('Order placed successfully! Cash on delivery selected.');
       setShowCheckout(false);
